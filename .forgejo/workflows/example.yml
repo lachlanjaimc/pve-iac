@@ -1,13 +1,31 @@
-name: Forgejo Actions Demo
+name: Terraform Test Workflow
 
 # Trigger the workflow on every git push
 on: [push]
 
 jobs:
-  test-job:
+  terraform-test:
     # Specifies the runner environment (typically 'docker')
     runs-on: docker
     
     steps:
-      - name: Print a message
-        run: echo "Forgejo Actions is successfully running!"
+    - uses: actions/checkout@v4
+    - uses: hashicorp/setup-terraform@v4
+
+    - name: Terraform fmt
+      id: fmt
+      run: terraform fmt -check
+      continue-on-error: true
+
+    - name: Terraform Init
+      id: init
+      run: terraform init -input=false
+
+    - name: Terraform Validate
+      id: validate
+      run: terraform validate -no-color
+
+    - name: Terraform Plan
+      id: plan
+      run: terraform plan -no-color -input=false
+      continue-on-error: true
