@@ -1,8 +1,9 @@
 terraform {
   required_providers {
-    terraform = {
-    source  = "bpg/proxmox"
-    version = ">= 0.110.0"
+    proxmox = {
+      source  = "bpg/proxmox"
+      version = ">= 0.110.0"
+    }
   }
 }
 
@@ -13,7 +14,6 @@ provider "proxmox" {
   insecure = true
 }
 
-# if creating a user token, the user must be created first
 resource "proxmox_virtual_environment_user" "user" {
   comment         = "Managed by Terraform"
   email           = "lachlan@pve"
