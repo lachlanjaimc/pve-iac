@@ -10,7 +10,7 @@ variable "proxmox_username" {
   sensitive   = true
 }
 
-variable "proxmox_username" {
+variable "proxmox_password" {
   description = "The password of the user to interact with Proxmox API"
   type        = string
   sensitive   = true
