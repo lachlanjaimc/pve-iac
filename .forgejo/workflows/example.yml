@@ -10,7 +10,7 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
-    - uses: hashicorp/setup-terraform@v4
+    - uses: https://github.com/hashicorp/setup-terraform@v4
 
     - name: Terraform fmt
       id: fmt
