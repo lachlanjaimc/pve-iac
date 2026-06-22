@@ -1,0 +1,13 @@
+name: Forgejo Actions Demo
+
+# Trigger the workflow on every git push
+on: [push]
+
+jobs:
+  test-job:
+    # Specifies the runner environment (typically 'docker')
+    runs-on: docker
+    
+    steps:
+      - name: Print a message
+        run: echo "Forgejo Actions is successfully running!"
