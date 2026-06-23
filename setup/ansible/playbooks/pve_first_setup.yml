@@ -1,0 +1,137 @@
+- name: Configure apt repositories for Proxmox node
+  hosts: pve
+  tasks:
+    - name: Disable the Proxmox VE Enterprise Repository
+      ansible.builtin.deb822_repository:
+        name: pve-enterprise
+        types: deb
+        uris: https://enterprise.proxmox.com/debian/pve
+        suites: trixie
+        components: pve-enterprise
+        signed_by: /usr/share/keyrings/proxmox-archive-keyring.gpg
+        enabled: false
+
+    - name: Disable the ceph-squid Enterprise Repository
+      ansible.builtin.deb822_repository:
+        name: ceph
+        types: deb
+        uris: https://enterpise.proxmox.com/debian/ceph-squid
+        suites: trixie
+        components: enterprise
+        signed_by: /usr/share/keyrings/proxmox-archive-keyring.gpg
+        enabled: false
+
+    - name: Enable the Proxmox VE No-Subscription Repository
+      ansible.builtin.deb822_repository:
+        name: proxmox
+        types: deb
+        uris: http://download.proxmox.com/debian/pve
+        suites: trixie
+        components: pve-no-subscription
+        signed_by: /usr/share/keyrings/proxmox-archive-keyring.gpg
+        enabled: true
+
+    - name: Enable the ceph-squid No-Subscription Repository
+      ansible.builtin.deb822_repository:
+        name: ceph-squid
+        types: deb
+        uris: http://download.proxmox.com/debian/ceph-squid
+        suites: trixie
+        components: no-subscription
+        signed_by: /usr/share/keyrings/proxmox-archive-keyring.gpg
+        enabled: true
+
+- name: Update the system and reboot if needed (e.g. kernel update)
+  hosts: pve
+  tasks:
+    - name: Update cache and all packages
+      ansible.builtin.apt:
+        name: "*"
+        state: latest
+        update_cache: yes
+
+    - name: Install needrestart package
+      ansible.builtin.apt:
+        name: "needrestart"
+        state: present
+
+    - name: Check needrestart status
+      command: needrestart -b
+      register: needrestart_result
+      changed_when: false
+
+    - name: Reboot if kernel or services require it
+      reboot:
+      when: >
+        'NEEDRESTART-KSTA: 2' in needrestart_result.stdout or
+        'NEEDRESTART-KSTA: 3' in needrestart_result.stdout or
+        'NEEDRESTART-SVC:' in needrestart_result.stdout
+
+- name: Harden the security of the pve hosts
+  hosts: pve
+  tasks:
+    - name: Install fail2ban
+      ansible.builtin.apt:
+        name: "fail2ban"
+        state: present
+
+    - name: Install unattended-upgrades
+      ansible.builtin.apt:
+        name: "unattended-upgrades"
+        state: present
+
+    - name: Configure unattended-upgrades update rules
+      ansible.builtin.copy:
+        dest: "/etc/apt/apt.conf.d/50unattended-upgrades"
+        content: |
+          Unattended-Upgrade::Allowed-Origins {
+            "Debian:bookworm-security";
+            "Debian:bookworm-updates";
+          };
+          Unattended-Upgrade::Package-Blacklist {
+            "proxmox-ve";
+            "pve-kernel";
+            "pve-manager";
+            "qemu-server";
+            "pve-qemu-kvm";
+            "pve-container";
+          };
+
+    - name: Configure auto-updates to run daily
+      ansible.builtin.copy:
+        dest: "/etc/apt/apt.conf.d/20auto-upgrades"
+        content: |
+          APT::Periodic::Update-Package-Lists "1";
+          APT::Periodic::Unattended-Upgrade "1";
+
+    - name: Set authorized key
+      ansible.posix.authorized_key:
+        user: root
+        state: present
+        key: "{{ lookup('file', lookup('ansible.builtin.env', 'ANSIBLE_SSH_KEY_PATH')) }}"
+
+    - name: Disallow SSH password authentication in main sshd_config
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "^PasswordAuthentication"
+        line: "PasswordAuthentication no"
+        state: present
+
+    - name: Find conf files in sshd_config.d directory
+      ansible.builtin.find:
+        paths: /etc/ssh/sshd_config.d/
+        patterns: "*.conf"
+      register: sshd_conf_files
+
+    - name: Ensure conf files don't allow PasswordAuthentication
+      ansible.builtin.lineinfile:
+        path: "{{ item.path }}"
+        regexp: "^PasswordAuthentication"
+        line: "PasswordAuthentication no"
+        state: present
+      loop: "{{ sshd_conf_files.files }}"
+
+    - name: Restart SSH service
+      ansible.builtin.service:
+        name: sshd
+        state: restarted

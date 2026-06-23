@@ -1,0 +1,7 @@
+pve:
+  hosts:
+    pve-host:
+      ansible_host: "{{ lookup ('ansible.builtin.env', 'ANSIBLE_PVE_ENDPOINT') }}"
+  vars:
+    ansible_user: "{{ lookup ('ansible.builtin.env', 'ANSIBLE_PVE_USERNAME') }}"
+    ansible_ssh_pass: "{{ lookup ('ansible.builtin.env', 'ANSIBLE_PVE_PASSWORD') }}"
